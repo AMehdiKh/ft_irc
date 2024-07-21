@@ -40,7 +40,7 @@ void Server::creatServer()
         std::cerr << "Error: bind failed" << std::endl;
         exit(1);
     }
-    if (listen(this->serverSocket, 1) == -1)
+    if (listen(this->serverSocket, 5) < 0)
     {
         std::cerr << "Error: listen failed" << std::endl;
         exit(1);
@@ -49,38 +49,99 @@ void Server::creatServer()
 
 void Server::run()
 {
-    int clientSocket;
-    struct sockaddr_in clientAddr;
-    socklen_t clientAddrSize = sizeof(clientAddr);
-    while (1)
+    pollfds.push_back({serverSocket, POLLIN, 0 });
+    while(1)
     {
-        clientSocket = accept(this->serverSocket, (struct sockaddr *)&clientAddr, &clientAddrSize);
-        if (clientSocket == -1)
+        int pollCount = poll(&pollfds[0], pollfds.size(), -1);
+        if (pollCount < 0)
         {
-            std::cerr << "Error: accept failed" << std::endl;
-            exit(1);
+            std::cerr << "Poll failed" << std::endl;
+            continue;
         }
-        this->handleRequest(clientSocket);
+        for (size_t i = 0; i < pollfds.size(); ++i)
+        {
+            if (pollfds[i].revents & POLLIN)
+            {
+                if (pollfds[i].fd == serverSocket) 
+                {
+                    acceptNewClient();
+                }
+                else 
+                {
+                    processClientMessages(i);
+                }
+            }
+        }
+        
     }
 }
 
-void Server::handleRequest(int clientSocket)
+void Server::acceptNewClient()
 {
-    char buffer[1024] = {0};
-    int valread = read(clientSocket, buffer, 1024);
-    if (valread == -1)
+    struct sockaddr_in clientAddr;
+    socklen_t clientAddrSize = sizeof(clientAddr);
+    int clientSocket = accept(serverSocket, (struct sockaddr*)&clientAddr, &clientAddrSize);
+    if (clientSocket < 0)
     {
-        std::cerr << "Error: read failed" << std::endl;
-        exit(1);
+        std::cerr << "Accept failed" << std::endl;
+        return;
     }
-    if (std::string(buffer) == this->password)
-    {
-        send(clientSocket, "Access granted", 14, 0);
-    }
-    else
-    {
-        send(clientSocket, "Access denied", 13, 0);
-    }
-    close(clientSocket);
+
+    connectedClients.push_back(Client(clientSocket, clientAddr));
+    pollfds.push_back({ clientSocket, POLLIN, 0 });
+
+    std::cout << "New client connected: " << inet_ntoa(clientAddr.sin_addr) << std::endl;
 }
+
+void Server::processClientMessages(int index)
+{
+    Client& client = connectedClients[index - 1];
+    std::string message = client.receiveMessage();
+    if (message.empty()) {
+        close(client.getSocket());
+        connectedClients.erase(connectedClients.begin() + (index - 1));
+        pollfds.erase(pollfds.begin() + index);
+        std::cout << "Client disconnected" << std::endl;
+    } else {
+        std::cout << "Received from " << client.getAddress() << ": " << message << std::endl;
+        handleClientCommand(client, message);
+    }
+}
+
+void Server::handleClientCommand(Client& client, const std::string& command) {
+    std::istringstream iss(command);
+    std::string cmd;
+    iss >> cmd;
+
+    if (cmd == "NICK") {
+        std::string nickname;
+        iss >> nickname;
+        client.setNickname(nickname);
+        std::cout << "Client " << client.getAddress() << " set nickname to " << nickname << std::endl;
+    } else if (cmd == "USER") {
+        std::string username;
+        iss >> username;
+        client.setUsername(username);
+        std::cout << "Client " << client.getAddress() << " set username to " << username << std::endl;
+    } else if (cmd == "JOIN") {
+        std::string channel;
+        iss >> channel;
+        client.joinChannel(channel);
+        std::cout << "Client " << client.getAddress() << " joined channel " << channel << std::endl;
+    } else if (cmd == "PART") {
+        std::string channel;
+        iss >> channel;
+        client.leaveChannel(channel);
+        std::cout << "Client " << client.getAddress() << " left channel " << channel << std::endl;
+    } else if (cmd == "PRIVMSG") {
+        std::string target;
+        std::string message;
+        iss >> target;
+        std::getline(iss, message);
+        message = message.substr(1); // Remove leading space
+        client.sendMessage(target, message);
+        std::cout << "Client " << client.getAddress() << " sent message to " << target << ": " << message << std::endl;
+    }
+}
+
 

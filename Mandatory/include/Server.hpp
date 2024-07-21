@@ -15,6 +15,11 @@
 # include <iostream>
 # include <netinet/in.h>
 # include <sys/socket.h>
+# include <unistd.h>
+# include <sstream>
+# include <vector>
+# include <poll.h>
+# include "../include/Client.hpp"
 
 class Server
 {
@@ -22,7 +27,8 @@ class Server
         int serverSocket;
         int port;
         std::string password;
-
+        std::vector<Client> connectedClients;
+        std::vector<struct pollfd> pollfds;
 
     public:
         Server(int port, std::string password);
@@ -33,6 +39,7 @@ class Server
         struct sockaddr_in sockAddr;
         
         void creatServer();
-        void handlRequest();
-
+        void acceptNewClient();
+        void processClientMessages(int index);
+        void handleClientCommand(Client& client, const std::string& command);
 };

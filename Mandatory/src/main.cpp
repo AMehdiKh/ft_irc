@@ -11,10 +11,10 @@
 /* ************************************************************************** */
 
 # include "../include/Server.hpp"
+# include "../include/Client.hpp"
 
 int main(int ac, char **av)
 {
-    Server server;
     if (ac != 3)
     {
         std::cerr << "Usage: " << av[0] << " <port>" << std::endl;
@@ -22,7 +22,7 @@ int main(int ac, char **av)
     }
     int port = std::stoi(av[1]);
     std::string password = av[2];
-    server(port, password);
+    Server server(port, password);
     server.run();
     return 0;
 }
