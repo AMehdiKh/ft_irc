@@ -26,7 +26,7 @@ NAME = irc
 CC = c++
 CFLAGS = -Wall -Wextra -Werror -std=c++98
 
-SRCS = src/main.cpp src/Server.cpp src/Client.cpp
+SRCS = src/main.cpp src/Server.cpp
 OBJS = $(SRCS:.cpp=.o)
 
 HEADERS = src/Server.hpp src/Client.hpp

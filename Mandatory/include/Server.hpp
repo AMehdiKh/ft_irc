@@ -19,7 +19,9 @@
 # include <sstream>
 # include <vector>
 # include <poll.h>
-# include "../include/Client.hpp"
+# include <arpa/inet.h>
+
+# define BUFFER_SIZE 1024
 
 class Server
 {
@@ -27,8 +29,8 @@ class Server
         int serverSocket;
         int port;
         std::string password;
-        std::vector<Client> connectedClients;
         std::vector<struct pollfd> pollfds;
+        std::vector<int> authenticatedClients;
 
     public:
         Server(int port, std::string password);
@@ -41,5 +43,6 @@ class Server
         void creatServer();
         void acceptNewClient();
         void processClientMessages(int index);
-        void handleClientCommand(Client& client, const std::string& command);
+        void removeClient(int index);
+        bool authenticateClient(int clientSocket);
 };
